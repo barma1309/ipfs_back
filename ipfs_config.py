@@ -1,9 +1,52 @@
 import os
+import shutil
 import subprocess
 import logging
 
 # Версия модуля
-MODULE_VERSION = "2.1.7"
+MODULE_VERSION = "2.1.8"
+
+IPFS_DESKTOP_RELATIVE = os.path.join(
+    'resources', 'app.asar.unpacked', 'node_modules', 'kubo', 'kubo', 'ipfs.exe'
+)
+
+
+def resolve_ipfs_path(logger=None):
+    candidates = []
+
+    env_path = os.environ.get('IPFS_PATH')
+    if env_path:
+        candidates.append(env_path)
+
+    local_app = os.environ.get('LOCALAPPDATA', '')
+    if local_app:
+        candidates.append(os.path.join(local_app, 'Programs', 'IPFS Desktop', IPFS_DESKTOP_RELATIVE))
+
+    program_files = os.environ.get('ProgramFiles', r'C:\Program Files')
+    candidates.append(os.path.join(program_files, 'IPFS Desktop', IPFS_DESKTOP_RELATIVE))
+
+    program_files_x86 = os.environ.get('ProgramFiles(x86)', r'C:\Program Files (x86)')
+    candidates.append(os.path.join(program_files_x86, 'IPFS Desktop', IPFS_DESKTOP_RELATIVE))
+
+    which_path = shutil.which('ipfs')
+    if which_path:
+        candidates.append(which_path)
+
+    seen = set()
+    for path in candidates:
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        if os.path.isfile(path):
+            if logger:
+                logger.info(f"IPFS_PATH: Найден ipfs: {path}")
+            return path
+
+    searched = '\n  - '.join(seen)
+    raise FileNotFoundError(
+        f"ipfs.exe не найден. Проверены пути:\n  - {searched}\n"
+        "Установите IPFS Desktop/Kubo или задайте переменную окружения IPFS_PATH."
+    )
 
 
 def ensure_ipfs_initialized(ipfs_path, logger):
@@ -37,27 +80,17 @@ def setup_public_network(ipfs_path, logger, node_name):
             os.remove(swarm_key_path)
             logger.info(f"PUBLIC_NETWORK: Удалён swarm.key из {swarm_key_path} для работы в публичной сети")
 
-        result = subprocess.run(
+        subprocess.run(
             [ipfs_path, 'config', 'Routing.Type', 'dhtclient'],
             capture_output=True, text=True, check=True
         )
         logger.info("PUBLIC_NETWORK: DHT включён (Routing.Type = dhtclient)")
 
-        result = subprocess.run(
+        subprocess.run(
             [ipfs_path, 'config', 'Discovery.MDNS.Enabled', '--bool', 'true'],
             capture_output=True, text=True, check=True
         )
         logger.info("PUBLIC_NETWORK: mDNS включён (Discovery.MDNS.Enabled = true)")
-
-        try:
-            result = subprocess.run(
-                [ipfs_path, 'config', 'Discovery.MDNS.Interval', '--json', '30'],
-                capture_output=True, text=True, check=True
-            )
-            logger.info("PUBLIC_NETWORK: mDNS интервал установлен на 30 секунд")
-        except subprocess.CalledProcessError as e:
-            logger.warning(
-                f"PUBLIC_NETWORK_WARNING: Не удалось установить Discovery.MDNS.Interval: {e.stderr}. Продолжаем с настройками по умолчанию.")
 
     except subprocess.CalledProcessError as e:
         logger.error(f"PUBLIC_NETWORK_ERROR: Ошибка при настройке публичной сети: {e.stderr}")

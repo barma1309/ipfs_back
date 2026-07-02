@@ -3,10 +3,13 @@ import subprocess
 import logging
 from datetime import datetime
 from watchdog.events import FileSystemEventHandler
-from file_sync import sync_files_to_synced_dir, save_file_cid_mapping, load_deleted_files, save_deleted_files
+from file_sync import (
+    sync_files_to_synced_dir, save_file_cid_mapping, load_deleted_files, save_deleted_files,
+    add_deleted_file, find_cid_for_relative_path,
+)
 
 # Версия модуля
-MODULE_VERSION = "2.1.7"
+MODULE_VERSION = "2.1.8"
 
 class NewFileHandler(FileSystemEventHandler):
     def __init__(self, ipfs_path, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path, delete_after_sync=True):
@@ -30,12 +33,17 @@ class NewFileHandler(FileSystemEventHandler):
             try:
                 if self.synced_dir in event.src_path:
                     relative_path = os.path.relpath(event.src_path, self.synced_dir)
-                    deleted_files = load_deleted_files(self.deleted_files_path, self.logger)
-                    if relative_path not in deleted_files:
-                        deleted_files.append(relative_path)
+                    deleted_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    cid = find_cid_for_relative_path(self.file_cid_mapping, relative_path)
+                    deleted_files = load_deleted_files(
+                        self.deleted_files_path, self.logger, self.file_cid_mapping
+                    )
+                    if add_deleted_file(deleted_files, relative_path, cid, deleted_at, self.logger):
                         save_deleted_files(self.deleted_files_path, deleted_files, self.logger)
                         self.logger.info(
-                            f"REMOVE_FILE_SYNCED: Файл {relative_path} удалён из Synced_dir в {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                            f"REMOVE_FILE_SYNCED: Файл {relative_path} удалён из Synced_dir "
+                            f"(CID: {cid or 'неизвестно'}, дата: {deleted_at})"
+                        )
             except ValueError as e:
                 self.logger.debug(f"REMOVE_FILE_SKIPPED: Пропущен файл {event.src_path}, не в Synced_dir: {e}")
 

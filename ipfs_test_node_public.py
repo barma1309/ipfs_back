@@ -4,13 +4,13 @@ import json
 import logging
 import asyncio
 from watchdog.observers import Observer
-from ipfs_config import ensure_ipfs_initialized, setup_public_network, MODULE_VERSION as IPFS_CONFIG_VERSION
+from ipfs_config import ensure_ipfs_initialized, setup_public_network, resolve_ipfs_path, MODULE_VERSION as IPFS_CONFIG_VERSION
 from file_monitor import NewFileHandler, check_new_files, MODULE_VERSION as FILE_MONITOR_VERSION
 from network_manager import manage_mdns_connections, list_pinned_files, MODULE_VERSION as NETWORK_MANAGER_VERSION
 from file_sync import MODULE_VERSION as FILE_SYNC_VERSION
 
 # Версия скрипта
-SCRIPT_VERSION = "2.1.7"
+SCRIPT_VERSION = "2.1.8"
 
 # Настройка логирования
 def setup_logging(node_name):
@@ -59,7 +59,7 @@ def initialize_file_cid_mapping(mapping_file, logger):
 
 async def main():
     node_name = 'local'
-    ipfs_path = r"C:\Program Files\IPFS Desktop\resources\app.asar.unpacked\node_modules\kubo\kubo\ipfs.exe"
+
     upload_dir = os.path.join(os.path.dirname(__file__), 'Upload')
     synced_dir = os.path.join(os.path.dirname(__file__), 'Synced_dir')
     mapping_file = os.path.join(os.path.dirname(__file__), 'data', 'file_cid_mapping.json')
@@ -67,6 +67,13 @@ async def main():
 
     logger = setup_logging(node_name)
     logger.info(f"START: Запуск скрипта версии {SCRIPT_VERSION} (публичная сеть) с узлом {node_name}")
+
+    logger.info("MAIN: Поиск ipfs.exe")
+    try:
+        ipfs_path = resolve_ipfs_path(logger)
+    except FileNotFoundError as e:
+        logger.error(f"MAIN_ERROR: {e}")
+        return
 
     logger.info("MAIN: Проверка директорий")
     try:
@@ -103,6 +110,9 @@ async def main():
         except Exception as e:
             logger.error(f"MAIN_ERROR: Не удалось запустить демон IPFS: {e}")
             return
+    except FileNotFoundError as e:
+        logger.error(f"MAIN_ERROR: ipfs.exe не найден: {e}")
+        return
     except Exception as e:
         logger.error(f"MAIN_ERROR: Неизвестная ошибка при проверке демона IPFS: {e}")
         return
@@ -141,6 +151,7 @@ async def main():
         return
 
     logger.info("MAIN: Настройка наблюдателя за файловой системой")
+    observer = None
     try:
         event_handler = NewFileHandler(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path, delete_after_sync=True)
         observer = Observer()
@@ -150,7 +161,8 @@ async def main():
         logger.info("MAIN: Наблюдатель запущен")
     except Exception as e:
         logger.error(f"MAIN_ERROR: Ошибка при настройке наблюдателя: {e}")
-        observer.stop()
+        if observer is not None:
+            observer.stop()
         return
 
     logger.info("MAIN: Запуск цикла проверки пинов и mDNS")
@@ -165,8 +177,9 @@ async def main():
     except Exception as e:
         logger.error(f"MAIN_ERROR: Ошибка в основном цикле: {e}")
     finally:
-        observer.stop()
-        observer.join()
+        if observer is not None:
+            observer.stop()
+            observer.join()
 
 async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path):
     while True:
