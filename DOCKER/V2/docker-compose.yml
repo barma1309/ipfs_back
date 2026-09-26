@@ -25,6 +25,7 @@ services:
       - ./ipfs-repo:/data/ipfs
     environment:
       IPFS_PATH: /data/ipfs
+      IPFS_BIN: /usr/local/bin/ipfs
     # Для публичной сети контейнеру нужен исходящий интернет.
     # host-сеть на Linux даёт лучший NAT/mDNS; на Docker Desktop (Windows/macOS)
     # оставляйте bridge + проброс 4001.
