@@ -1,0 +1,30 @@
+# ipfs_back 2.2.2
+# Сборка: docker compose up --build
+# Файлы с хоста:
+#   ./Upload      — кладёте новые файлы
+#   ./Synced_dir  — получаете копии
+#   ./data        — mapping, deleted_files, логи
+#   ./ipfs-repo   — репозиторий Kubo (PeerID сохраняется между перезапусками)
+
+services:
+  ipfs-back:
+    build:
+      context: .
+      args:
+        KUBO_VERSION: v0.38.2
+    container_name: ipfs-back
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+      - "4001:4001/udp"
+      - "8080:8080"
+    volumes:
+      - ./Upload:/app/Upload
+      - ./Synced_dir:/app/Synced_dir
+      - ./data:/app/data
+      - ./ipfs-repo:/data/ipfs
+    environment:
+      IPFS_PATH: /data/ipfs
+    # Для публичной сети контейнеру нужен исходящий интернет.
+    # host-сеть на Linux даёт лучший NAT/mDNS; на Docker Desktop (Windows/macOS)
+    # оставляйте bridge + проброс 4001.
