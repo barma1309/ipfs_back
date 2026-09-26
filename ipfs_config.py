@@ -1,29 +1,33 @@
 # ipfs_config.py
 # Инициализация репозитория и публичной сети Kubo.
-# Версия 2.2.2:
-#   * Discovery.MDNS.Interval удалён из конфига Kubo — больше не выставляем
-#   * Routing.Type=autoclient (актуальный клиентский режим вместо dhtclient)
-#   * поиск ipfs.exe: env IPFS_PATH → PATH → типичные пути Windows
+# Версия 2.2.3:
+#   * CLI: IPFS_BIN → PATH → Windows-пути (IPFS_PATH больше не считается бинарником)
+#   * репозиторий: env IPFS_PATH → ~/.ipfs
+#   * init только если нет $IPFS_PATH/config
 
 import os
 import shutil
 import subprocess
 
-MODULE_VERSION = "2.2.2"
+MODULE_VERSION = "2.2.3"
+
+
+def _repo_dir():
+    return os.environ.get("IPFS_PATH") or os.path.expanduser("~/.ipfs")
 
 
 def resolve_ipfs_path(logger=None):
     """
     Ищет исполняемый файл Kubo CLI.
     Приоритет:
-      1. переменная окружения IPFS_PATH (полный путь к ipfs.exe / ipfs)
-      2. команда ipfs / ipfs.exe в PATH
-      3. известные пути IPFS Desktop и standalone Kubo на Windows
+      1. IPFS_BIN
+      2. ipfs / ipfs.exe в PATH
+      3. известные пути IPFS Desktop / Kubo на Windows
     """
-    env_path = os.environ.get("IPFS_PATH")
     candidates = []
-    if env_path:
-        candidates.append(env_path)
+    env_bin = os.environ.get("IPFS_BIN")
+    if env_bin:
+        candidates.append(env_bin)
 
     which = shutil.which("ipfs") or shutil.which("ipfs.exe")
     if which:
@@ -67,30 +71,34 @@ def resolve_ipfs_path(logger=None):
         seen.add(path)
         if os.path.isfile(path):
             if logger:
-                logger.info(f"IPFS_PATH_RESOLVED: найден CLI: {path}")
+                logger.info(f"IPFS_BIN_RESOLVED: найден CLI: {path}")
             return path
 
     raise FileNotFoundError(
-        "Не найден ipfs.exe. Установите IPFS Desktop / Kubo, добавьте ipfs в PATH "
-        "или задайте полный путь в переменной окружения IPFS_PATH."
+        "Не найден ipfs. Укажите IPFS_BIN или добавьте ipfs в PATH."
     )
 
 
 def ensure_ipfs_initialized(ipfs_path, logger):
     logger.info(f"MODULE_VERSION: ipfs_config версия {MODULE_VERSION}")
     try:
-        ipfs_dir = os.path.expanduser("~/.ipfs")
-        if not os.path.exists(ipfs_dir):
-            logger.info("IPFS_INIT: Репозиторий IPFS не найден, инициализация...")
+        ipfs_dir = _repo_dir()
+        config_file = os.path.join(ipfs_dir, "config")
+        env = os.environ.copy()
+        env["IPFS_PATH"] = ipfs_dir
+
+        if not os.path.isfile(config_file):
+            logger.info(f"IPFS_INIT: Репозиторий IPFS не найден ({ipfs_dir}), инициализация...")
             result = subprocess.run(
                 [ipfs_path, "init"],
                 capture_output=True,
                 text=True,
                 check=True,
+                env=env,
             )
             logger.info(f"IPFS_INIT: Репозиторий успешно инициализирован: {result.stdout}")
         else:
-            logger.info("IPFS_INIT: Репозиторий IPFS уже существует")
+            logger.info(f"IPFS_INIT: Репозиторий IPFS уже существует: {ipfs_dir}")
     except subprocess.CalledProcessError as e:
         logger.error(f"IPFS_INIT_ERROR: Ошибка при инициализации IPFS: {e.stderr}")
         raise
@@ -100,13 +108,11 @@ def ensure_ipfs_initialized(ipfs_path, logger):
 
 
 def setup_public_network(ipfs_path, logger, node_name):
-    """
-    Готовит узел к публичной сети Amino DHT.
-    swarm.key удаляется, чтобы не остаться в приватном swarm.
-    """
     logger.info(f"MODULE_VERSION: ipfs_config версия {MODULE_VERSION}")
     try:
-        ipfs_dir = os.path.expanduser("~/.ipfs")
+        ipfs_dir = _repo_dir()
+        env = os.environ.copy()
+        env["IPFS_PATH"] = ipfs_dir
         swarm_key_path = os.path.join(ipfs_dir, "swarm.key")
 
         if os.path.exists(swarm_key_path):
@@ -115,13 +121,12 @@ def setup_public_network(ipfs_path, logger, node_name):
                 f"PUBLIC_NETWORK: Удалён swarm.key из {swarm_key_path} для работы в публичной сети"
             )
 
-        # autoclient: публичный DHT + delegated routers, без роли DHT-сервера.
-        # Ключ dhtclient ещё принимается, но default Kubo 0.38+ — auto/autoclient.
         subprocess.run(
             [ipfs_path, "config", "Routing.Type", "autoclient"],
             capture_output=True,
             text=True,
             check=True,
+            env=env,
         )
         logger.info("PUBLIC_NETWORK: DHT включён (Routing.Type = autoclient)")
 
@@ -130,14 +135,10 @@ def setup_public_network(ipfs_path, logger, node_name):
             capture_output=True,
             text=True,
             check=True,
+            env=env,
         )
         logger.info("PUBLIC_NETWORK: mDNS включён (Discovery.MDNS.Enabled = true)")
-
-        # Discovery.MDNS.Interval REMOVED в современном Kubo (zeroconf mDNS).
-        # Попытка выставить ключ даёт warning и ничего не меняет — поэтому не вызываем.
-        logger.info(
-            "PUBLIC_NETWORK: Discovery.MDNS.Interval не задаём (ключ удалён в Kubo)"
-        )
+        logger.info("PUBLIC_NETWORK: Discovery.MDNS.Interval не задаём (ключ удалён в Kubo)")
     except subprocess.CalledProcessError as e:
         logger.error(f"PUBLIC_NETWORK_ERROR: Ошибка при настройке публичной сети: {e.stderr}")
         raise
