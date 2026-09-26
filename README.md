@@ -8,6 +8,10 @@ Python-агент + Kubo в одном контейнере: файлы из `Up
 - пинит CID, пишет mapping в `data/`
 - забирает файлы пиров в `Synced_dir/`
 
+
+сборка из DOCKER/V2, перед build копировать *.py
+
+
 ## Запуск (Podman / Docker)
 
 ```bash
