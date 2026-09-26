@@ -38,7 +38,7 @@ SCRIPT_VERSION = "2.2.2"
 
 def setup_logging(node_name):
     """Файловый + консольный логгер. Старый лог обнуляется при старте."""
-    log_dir = os.path.join(os.path.dirname(__file__), "data", "logs")
+    log_dir = os.path.join(os.path.dirname(__file__), "../data", "logs")
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"log_{node_name}.log")
     if os.path.exists(log_file):
@@ -110,10 +110,10 @@ def initialize_file_cid_mapping(mapping_file, logger):
 
 async def main():
     node_name = "local"
-    upload_dir = os.path.join(os.path.dirname(__file__), "Upload")
-    synced_dir = os.path.join(os.path.dirname(__file__), "Synced_dir")
-    mapping_file = os.path.join(os.path.dirname(__file__), "data", "file_cid_mapping.json")
-    deleted_files_path = os.path.join(os.path.dirname(__file__), "data", "deleted_files.json")
+    upload_dir = os.path.join(os.path.dirname(__file__), "../Upload")
+    synced_dir = os.path.join(os.path.dirname(__file__), "../Synced_dir")
+    mapping_file = os.path.join(os.path.dirname(__file__), "../data", "file_cid_mapping.json")
+    deleted_files_path = os.path.join(os.path.dirname(__file__), "../data", "deleted_files.json")
 
     logger = setup_logging(node_name)
     logger.info(

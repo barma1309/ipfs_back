@@ -98,7 +98,7 @@ class NewFileHandler(FileSystemEventHandler):
     def add_to_ipfs(self, file_path):
         self.logger.info(f"ADD_TO_IPFS_START: Начало добавления файла {file_path} в IPFS")
         try:
-            upload_dir = os.path.join(os.path.dirname(__file__), "Upload")
+            upload_dir = os.path.join(os.path.dirname(__file__), "../Upload")
             if upload_dir not in file_path:
                 self.logger.warning(f"ADD_TO_IPFS_SKIPPED: Файл {file_path} не в Upload, пропущен")
                 return
@@ -130,7 +130,7 @@ class NewFileHandler(FileSystemEventHandler):
                     self.logger.info(f"PIN_ADD: Файл {path} запинен с CID {cid}")
                     _announce_cid(self.ipfs_path, cid, self.logger, path)
 
-            mapping_file = os.path.join(os.path.dirname(__file__), "data", "file_cid_mapping.json")
+            mapping_file = os.path.join(os.path.dirname(__file__), "../data", "file_cid_mapping.json")
             save_file_cid_mapping(mapping_file, self.file_cid_mapping, self.logger)
             sync_files_to_synced_dir(
                 self.ipfs_path,
