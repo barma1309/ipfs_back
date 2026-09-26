@@ -19,10 +19,10 @@ services:
       - "4001:4001/udp"
       - "8080:8080"
     volumes:
-      - ./Upload:/app/Upload
-      - ./Synced_dir:/app/Synced_dir
-      - ./data:/app/data
-      - ./ipfs-repo:/data/ipfs
+      - ./Upload:/app/Upload:Z
+      - ./Synced_dir:/app/Synced_dir:Z
+      - ./data:/app/data:Z
+      - ./ipfs-repo:/data/ipfs:Z
     environment:
       IPFS_PATH: /data/ipfs
       IPFS_BIN: /usr/local/bin/ipfs
