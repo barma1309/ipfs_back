@@ -1,12 +1,12 @@
 # ipfs_test_node_public.py
-# Главный модуль агента синхронизации файлов через локальный Kubo CLI.
-# Версия 2.3.0 — SQLite и совместимость с Kubo 0.27–0.43:
-#   * автоматическая миграция JSON в SQLite при первом запуске
-#   * routing через `ipfs routing findprovs`, не `ipfs dht *`
-#   * не вызываем findpeer для собственного PeerID
-#   * Discovery.MDNS.Interval больше не настраивается (ключ удалён в Kubo)
-#   * Routing.Type=autoclient вместо устаревшего по смыслу dhtclient-дефолта
-#   * после pin — `ipfs provide once` (routing provide deprecated с 0.42)
+# File synchronization agent entry point using the local Kubo CLI.
+# Version 2.3.1: SQLite storage and compatibility with Kubo 0.27-0.43.
+#   * migrate JSON to SQLite automatically on first startup
+#   * use `ipfs routing findprovs` instead of `ipfs dht *`
+#   * do not call findpeer for the node's own PeerID
+#   * do not configure Discovery.MDNS.Interval (removed in Kubo)
+#   * set Routing.Type=autoclient instead of the older dhtclient default
+#   * call `ipfs provide once` after pinning (routing provide deprecated in 0.42)
 
 import os
 import subprocess
@@ -33,12 +33,12 @@ from network_manager import (
 from file_sync import MODULE_VERSION as FILE_SYNC_VERSION
 from storage import FileCIDMapping, MODULE_VERSION as STORAGE_VERSION
 
-# Единая версия пакета. Все модули должны совпадать.
-SCRIPT_VERSION = "2.3.0"
+# Shared release version. All module versions must match.
+SCRIPT_VERSION = "2.3.1"
 
 
 def setup_logging(node_name):
-    """Файловый + консольный логгер. Старый лог обнуляется при старте."""
+    """Configure file and console logging; truncate the previous log on startup."""
     log_dir = os.path.join(os.path.dirname(__file__), "../data", "logs")
     os.makedirs(log_dir, exist_ok=True)
     log_file = os.path.join(log_dir, f"log_{node_name}.log")

@@ -1,15 +1,15 @@
 # ipfs_config.py
-# Инициализация репозитория и публичной сети Kubo.
-# Версия 2.3.0:
-#   * CLI: IPFS_BIN → PATH → Windows-пути (IPFS_PATH больше не считается бинарником)
-#   * репозиторий: env IPFS_PATH → ~/.ipfs
-#   * init только если нет $IPFS_PATH/config
+# Initialize the Kubo repository and configure the public network.
+# Version 2.3.1:
+#   * CLI: IPFS_BIN -> PATH -> Windows locations (IPFS_PATH is a repository path)
+#   * repository: IPFS_PATH environment variable -> ~/.ipfs
+#   * initialize only when $IPFS_PATH/config is missing
 
 import os
 import shutil
 import subprocess
 
-MODULE_VERSION = "2.3.0"
+MODULE_VERSION = "2.3.1"
 
 
 def _repo_dir():
@@ -18,11 +18,11 @@ def _repo_dir():
 
 def resolve_ipfs_path(logger=None):
     """
-    Ищет исполняемый файл Kubo CLI.
-    Приоритет:
+    Locate the Kubo CLI executable.
+    Search order:
       1. IPFS_BIN
-      2. ipfs / ipfs.exe в PATH
-      3. известные пути IPFS Desktop / Kubo на Windows
+      2. ipfs / ipfs.exe on PATH
+      3. Common IPFS Desktop / Kubo installation paths on Windows
     """
     candidates = []
     env_bin = os.environ.get("IPFS_BIN")

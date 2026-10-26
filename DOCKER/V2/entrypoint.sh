@@ -10,7 +10,7 @@ if [ ! -f "$IPFS_PATH/config" ]; then
   ipfs init --profile=server
 fi
 
-# API только внутри контейнера. Swarm снаружи — для публичной сети.
+# Keep the API inside the container; expose Swarm for the public network.
 ipfs config Addresses.API /ip4/127.0.0.1/tcp/5001
 ipfs config Addresses.Gateway /ip4/0.0.0.0/tcp/8080
 ipfs config --json Addresses.Swarm '["/ip4/0.0.0.0/tcp/4001","/ip4/0.0.0.0/udp/4001/quic-v1"]'

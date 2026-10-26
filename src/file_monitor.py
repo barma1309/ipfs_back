@@ -1,8 +1,8 @@
 # file_monitor.py
-# Наблюдение за Upload/Synced_dir, add+pin, запись mapping.
-# Версия 2.3.0:
-#   * после pin add вызываем `ipfs provide once` (routing provide deprecated с Kubo 0.42)
-#   * CID, даты добавления и удаления сохраняются в SQLite
+# Watch Upload/Synced_dir, add and pin files, and persist mappings.
+# Version 2.3.1:
+#   * call `ipfs provide once` after pinning (routing provide deprecated in Kubo 0.42)
+#   * store CIDs, addition dates, and deleted paths in SQLite
 
 import os
 import subprocess
@@ -12,14 +12,14 @@ from watchdog.events import FileSystemEventHandler
 from file_sync import sync_files_to_synced_dir
 from storage import mark_deleted_file
 
-MODULE_VERSION = "2.3.0"
+MODULE_VERSION = "2.3.1"
 
 
 def _announce_cid(ipfs_path, cid, logger, path):
     """
-    Явно анонсируем CID в routing.
-    `ipfs routing provide` помечен deprecated; с Kubo 0.42 — `ipfs provide once`.
-    Если команда отсутствует (старый 0.35), пробуем fallback и пишем warning.
+    Announce the CID to the routing system.
+    `ipfs routing provide` is deprecated; use `ipfs provide once` since Kubo 0.42.
+    For older versions such as 0.35, fall back to routing provide and log failures.
     """
     try:
         subprocess.run(

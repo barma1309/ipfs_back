@@ -1,4 +1,4 @@
-# ipfs_back 2.3.0 — Python-агент + Kubo CLI в одном образе
+# ipfs_back 2.3.1: Python agent and Kubo CLI in one image
 FROM python:3.12-slim-bookworm
 
 ARG KUBO_VERSION=v0.38.2
@@ -8,7 +8,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Официальный tarball Kubo: amd64 / arm64
+# Official Kubo tarball for amd64 / arm64
 RUN set -eux; \
     arch="${TARGETARCH:-amd64}"; \
     case "$arch" in \

@@ -1,12 +1,12 @@
 # file_sync.py
-# Синхронизация файлов по CID, список удалённых файлов из SQLite.
-# Версия 2.3.0: хранение mapping и удалённых файлов в SQLite.
+# Synchronize files by CID and read deleted paths from SQLite.
+# Version 2.3.1: store file mappings and deleted paths in SQLite.
 
 import os
 import subprocess
 from storage import load_deleted_files
 
-MODULE_VERSION = "2.3.0"
+MODULE_VERSION = "2.3.1"
 
 
 def _entry_cid(entry):

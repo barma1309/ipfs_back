@@ -1,43 +1,65 @@
-# ipfs_back 2.3.0
+# ipfs_back 2.3.1
 
-Python-агент + Kubo в одном контейнере: файлы из `Upload/` пинятся в публичную сеть IPFS и раскладываются в `Synced_dir/` на узлах.
+A Python agent and Kubo in one container: files from `Upload/` are pinned to
+the public IPFS network and synchronized to `Synced_dir/` on nodes.
 
-## Что делает
-- поднимает Kubo (`IPFS_PATH=/data/ipfs`)
-- следит за `Upload/`
-- пинит CID, сохраняет пути, CID и даты добавления в SQLite `data/ipfs.sqlite3`
-- забирает файлы пиров в `Synced_dir/`
+## Features
 
+- Starts Kubo with `IPFS_PATH=/data/ipfs`.
+- Watches `Upload/` for new files.
+- Pins CIDs and stores file paths, CIDs, and addition dates in `data/ipfs.sqlite3`.
+- Downloads peer files into `Synced_dir/`.
 
-При первом запуске существующие `data/file_cid_mapping.json` и
-`data/deleted_files.json` автоматически импортируются в SQLite одной транзакцией.
-Поддерживаются оба формата mapping: строка CID и объект `{cid, date_added}`.
-Исходные JSON остаются на диске, но после миграции больше не читаются и не обновляются.
-Если JSON повреждён, запуск останавливается: исправьте файл и повторите запуск.
-Список удалённых файлов также хранится в БД. Дополнительные зависимости не нужны:
-используется стандартный модуль Python `sqlite3`.
+## SQLite storage
 
-Для переноса данных при остановленном агенте копируйте `data/ipfs.sqlite3`
-вместе с файлами `ipfs.sqlite3-wal` и `ipfs.sqlite3-shm`, если они присутствуют.
+On first startup, existing `data/file_cid_mapping.json` and
+`data/deleted_files.json` are imported into SQLite in a single transaction.
+Both mapping formats are supported: CID strings and `{cid, date_added}` objects.
+Deleted entries can be path strings or objects containing `path`, `cid`, and
+`deleted_at`.
 
-Сборка из DOCKER/V2, перед build копировать все `src/*.py`, включая `storage.py`.
+The original JSON files remain on disk but are no longer read or updated after
+migration. If JSON input is invalid, startup stops: correct the file and retry.
+Deleted paths are also stored in SQLite. Database access uses Python's standard
+`sqlite3` module and requires no additional dependency.
 
-## Тесты
+To move the data, stop the agent and copy `data/ipfs.sqlite3` together with
+`ipfs.sqlite3-wal` and `ipfs.sqlite3-shm` if those files are present.
 
-Из корня проекта, используя Python из окружения проекта:
+## uv environment
+
+Project settings and dependencies are defined in `pyproject.toml`; exact versions
+are recorded in `uv.lock`. Install the environment and run the agent from the
+project root:
 
 ```bash
-python -m unittest discover -s tests -v
+uv sync --locked
+uv run --locked src/ipfs_test_node_public.py
 ```
 
-Тесты используют временные SQLite-БД и каталоги. Вызовы Kubo подменены:
-запущенный IPFS и доступ к сети не требуются, рабочие данные не изменяются.
+Python 3.12 or later and the Kubo CLI are required.
+Docker uses a separate `DOCKER/V2/requirements.txt`; keep it in sync with
+`pyproject.toml` when changing dependencies.
 
+## Tests
 
-## Запуск (Podman / Docker)
+Run from the project root:
+
+```bash
+uv run --locked python -m unittest discover -s tests -v
+```
+
+Tests use temporary SQLite databases and directories. Kubo calls are mocked,
+so no running IPFS daemon or network access is required. Working data is unchanged.
+
+## Run with Podman or Docker
+
+Build from `DOCKER/V2`. Before building, copy all `src/*.py` files, including
+`storage.py`, into `DOCKER/V2`.
 
 ```bash
 cd DOCKER/V2
 mkdir -p Upload Synced_dir data ipfs-repo
 podman compose -f docker-compose.yml up -d --build
 podman logs -f ipfs-back
+```

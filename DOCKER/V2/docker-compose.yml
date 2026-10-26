@@ -1,10 +1,10 @@
-# ipfs_back 2.3.0
-# Сборка: docker compose up --build
-# Файлы с хоста:
-#   ./Upload      — кладёте новые файлы
-#   ./Synced_dir  — получаете копии
-#   ./data        — mapping, deleted_files, логи
-#   ./ipfs-repo   — репозиторий Kubo (PeerID сохраняется между перезапусками)
+# ipfs_back 2.3.1
+# Build: docker compose up --build
+# Host directories:
+#   ./Upload      - incoming files
+#   ./Synced_dir  - synchronized copies
+#   ./data        - SQLite database and logs
+#   ./ipfs-repo   - Kubo repository (preserves PeerID across restarts)
 
 services:
   ipfs-back:
@@ -26,6 +26,6 @@ services:
     environment:
       IPFS_PATH: /data/ipfs
       IPFS_BIN: /usr/local/bin/ipfs
-    # Для публичной сети контейнеру нужен исходящий интернет.
-    # host-сеть на Linux даёт лучший NAT/mDNS; на Docker Desktop (Windows/macOS)
-    # оставляйте bridge + проброс 4001.
+    # The public network requires outbound internet access from the container.
+    # Host networking improves NAT/mDNS on Linux. On Docker Desktop (Windows/macOS),
+    # use bridge networking with port 4001 forwarded.

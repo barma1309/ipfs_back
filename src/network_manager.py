@@ -1,18 +1,18 @@
 # network_manager.py
-# Пиры, routing-проверка и список пинов.
-# Версия 2.3.0:
-#   * ipfs dht * заменён на ipfs routing findprovs (dht API снят с 0.27)
-#   * не ищем собственный PeerID через findpeer
-#   * list_pinned_files читает mapping {cid, date_added} из SQLite
+# Manage peers, check routing, and list pinned files.
+# Version 2.3.1:
+#   * use ipfs routing findprovs (the dht API was removed in 0.27)
+#   * do not look up the node's own PeerID with findpeer
+#   * list_pinned_files reads {cid, date_added} mappings from SQLite
 
 import subprocess
 import asyncio
 
-MODULE_VERSION = "2.3.0"
+MODULE_VERSION = "2.3.1"
 
 
 def _first_cid(file_cid_mapping):
-    """Достаёт первый CID из mapping старого или нового формата."""
+    """Return the first CID from a legacy or current mapping."""
     if not file_cid_mapping:
         return None
     for entry in file_cid_mapping.values():
@@ -63,8 +63,8 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
                 except (subprocess.CalledProcessError, IndexError) as e:
                     logger.warning(f"MDNS_CONNECT_ERROR: Не удалось подключиться к {peer}: {str(e)}")
 
-            # Проверяем провайдеров CID, а не «себя в DHT».
-            # ipfs routing findpeer <own_peer_id> возвращает:
+            # Check CID providers rather than looking up this node in the DHT.
+            # ipfs routing findpeer <own_peer_id> returns:
             # "finding your own node in the DHT is currently not supported"
             cid = _first_cid(file_cid_mapping)
             if cid:
