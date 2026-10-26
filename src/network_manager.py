@@ -24,8 +24,8 @@ def _first_cid(file_cid_mapping):
 
 
 async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping=None):
-    logger.info(f"MODULE_VERSION: network_manager версия {MODULE_VERSION}")
-    logger.info("MDNS_CONNECTIONS_START: Начало управления mDNS соединениями")
+    logger.info(f"MODULE_VERSION: network_manager version {MODULE_VERSION}")
+    logger.info("MDNS_CONNECTIONS_START: Starting mDNS connection management")
 
     try:
         result = subprocess.run(
@@ -35,9 +35,9 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
             check=True,
         )
         own_peer_id = result.stdout.strip()
-        logger.info(f"MDNS_PEER_ID: PeerID узла {node_name}: {own_peer_id}")
+        logger.info(f"MDNS_PEER_ID: PeerID for node {node_name}: {own_peer_id}")
     except subprocess.CalledProcessError as e:
-        logger.error(f"MDNS_PEER_ID_ERROR: Ошибка при получении PeerID: {e.stderr}")
+        logger.error(f"MDNS_PEER_ID_ERROR: Failed to retrieve PeerID: {e.stderr}")
         own_peer_id = None
 
     while True:
@@ -49,9 +49,9 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
                 check=True,
             )
             peers = [p for p in result.stdout.splitlines() if p.strip()]
-            logger.info(f"MDNS_PEERS: Подключённые узлы: {len(peers)}")
+            logger.info(f"MDNS_PEERS: Connected peers: {len(peers)}")
             for peer in peers:
-                logger.debug(f"MDNS_PEERS: Активное соединение: {peer}")
+                logger.debug(f"MDNS_PEERS: Active connection: {peer}")
                 try:
                     subprocess.run(
                         [ipfs_path, "swarm", "connect", peer],
@@ -59,9 +59,9 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
                         text=True,
                         check=True,
                     )
-                    logger.debug(f"MDNS_CONNECT: Успешно подключено к {peer}")
+                    logger.debug(f"MDNS_CONNECT: Successfully connected to {peer}")
                 except (subprocess.CalledProcessError, IndexError) as e:
-                    logger.warning(f"MDNS_CONNECT_ERROR: Не удалось подключиться к {peer}: {str(e)}")
+                    logger.warning(f"MDNS_CONNECT_ERROR: Failed to connect to {peer}: {str(e)}")
 
             # Check CID providers rather than looking up this node in the DHT.
             # ipfs routing findpeer <own_peer_id> returns:
@@ -76,28 +76,28 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
                         text=True,
                         check=True,
                     )
-                    providers = result.stdout.strip() or "(пусто)"
-                    logger.info(f"ROUTING_CHECK: Найдены провайдеры для CID {cid}: {providers}")
+                    providers = result.stdout.strip() or "(empty)"
+                    logger.info(f"ROUTING_CHECK: Providers found for CID {cid}: {providers}")
                 except subprocess.CalledProcessError as e:
-                    logger.warning(f"ROUTING_CHECK_ERROR: Ошибка при проверке routing: {e.stderr}")
+                    logger.warning(f"ROUTING_CHECK_ERROR: Routing check failed: {e.stderr}")
                 except Exception as e:
-                    logger.warning(f"ROUTING_CHECK_ERROR: Общая ошибка при проверке routing: {str(e)}")
+                    logger.warning(f"ROUTING_CHECK_ERROR: Unexpected routing check error: {str(e)}")
             else:
-                logger.info("ROUTING_CHECK: Нет CID в mapping — пропускаем findprovs")
+                logger.info("ROUTING_CHECK: No CID in mapping; skipping findprovs")
 
-            logger.info("MDNS_CONNECTIONS: Ожидание 60 секунд")
+            logger.info("MDNS_CONNECTIONS: Waiting 60 seconds")
             await asyncio.sleep(60)
         except subprocess.CalledProcessError as e:
-            logger.error(f"MDNS_ERROR: Ошибка при управлении mDNS: {e.stderr}")
+            logger.error(f"MDNS_ERROR: Failed to manage mDNS connections: {e.stderr}")
             await asyncio.sleep(60)
         except Exception as e:
-            logger.error(f"MDNS_ERROR: Общая ошибка при управлении mDNS: {str(e)}")
+            logger.error(f"MDNS_ERROR: Unexpected error managing mDNS connections: {str(e)}")
             await asyncio.sleep(60)
 
 
 def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, database_path):
-    logger.info(f"MODULE_VERSION: network_manager версия {MODULE_VERSION}")
-    logger.info("LIST_PINNED_START: Начало вывода списка запиненных файлов")
+    logger.info(f"MODULE_VERSION: network_manager version {MODULE_VERSION}")
+    logger.info("LIST_PINNED_START: Starting pinned file listing")
     try:
         result = subprocess.run(
             [ipfs_path, "pin", "ls", "--type=all"],
@@ -112,9 +112,9 @@ def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir
                 cid, pin_type = parts[0], parts[1]
                 pinned_cids[cid] = pin_type
 
-        logger.info(f"LIST_PINNED: Список запинненных файлов и каталогов на ноде {node_name}:")
+        logger.info(f"LIST_PINNED: Pinned files and directories on node {node_name}:")
         if not file_cid_mapping:
-            logger.info("LIST_PINNED: Список файлов в SQLite пуст, нет файлов для отображения")
+            logger.info("LIST_PINNED: SQLite file list is empty; no files to display")
         for path, entry in file_cid_mapping.items():
             if isinstance(entry, dict):
                 cid = entry.get("cid", "")
@@ -122,9 +122,9 @@ def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir
             else:
                 cid = entry
                 date_added = "unknown"
-            pin_type = pinned_cids.get(cid, "неизвестно")
+            pin_type = pinned_cids.get(cid, "unknown")
             logger.info(
-                f"LIST_PINNED: CID: {cid}, Тип: {pin_type}, Путь: {path}, Дата добавления: {date_added}"
+                f"LIST_PINNED: CID: {cid}, Type: {pin_type}, Path: {path}, Date added: {date_added}"
             )
 
         from file_sync import sync_files_to_synced_dir
@@ -132,8 +132,8 @@ def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir
         sync_files_to_synced_dir(
             ipfs_path, synced_dir, logger, file_cid_mapping, database_path
         )
-        logger.info("LIST_PINNED_END: Завершение вывода списка запиненных файлов")
+        logger.info("LIST_PINNED_END: Finished pinned file listing")
     except subprocess.CalledProcessError as e:
-        logger.error(f"LIST_PINNED_ERROR: Ошибка при получении списка пинов: {e.stderr}")
+        logger.error(f"LIST_PINNED_ERROR: Failed to list pins: {e.stderr}")
     except Exception as e:
-        logger.error(f"LIST_PINNED_ERROR: Общая ошибка при получении списка пинов: {e}")
+        logger.error(f"LIST_PINNED_ERROR: Unexpected error listing pins: {e}")

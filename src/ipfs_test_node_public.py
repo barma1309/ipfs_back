@@ -62,7 +62,7 @@ def setup_logging(node_name):
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
-    logger.info(f"MODULE_VERSION: ipfs_test_node_public версия {SCRIPT_VERSION}")
+    logger.info(f"MODULE_VERSION: ipfs_test_node_public version {SCRIPT_VERSION}")
     expected_version = SCRIPT_VERSION
     for module, version in (
         ("ipfs_config", IPFS_CONFIG_VERSION),
@@ -73,8 +73,8 @@ def setup_logging(node_name):
     ):
         if version != expected_version:
             logger.warning(
-                f"VERSION_MISMATCH: Модуль {module} имеет версию {version}, "
-                f"ожидается {expected_version}"
+                f"VERSION_MISMATCH: Module {module} has version {version}, "
+                f"expected {expected_version}"
             )
     return logger
 
@@ -83,7 +83,7 @@ def initialize_file_cid_mapping(database_path, logger):
     try:
         return FileCIDMapping(database_path)
     except Exception:
-        logger.exception("MAIN_ERROR: Не удалось инициализировать SQLite или перенести JSON")
+        logger.exception("MAIN_ERROR: Failed to initialize SQLite or migrate JSON")
         return None
 
 
@@ -95,35 +95,35 @@ async def main():
 
     logger = setup_logging(node_name)
     logger.info(
-        f"START: Запуск скрипта версии {SCRIPT_VERSION} (публичная сеть) с узлом {node_name}"
+        f"START: Starting script version {SCRIPT_VERSION} (public network) on node {node_name}"
     )
 
-    logger.info("MAIN: Проверка директорий")
+    logger.info("MAIN: Checking directories")
     try:
         os.makedirs(upload_dir, exist_ok=True)
         os.makedirs(synced_dir, exist_ok=True)
         os.makedirs(os.path.dirname(database_path), exist_ok=True)
         logger.info(
-            f"MAIN: Директории созданы: {upload_dir}, {synced_dir}, {os.path.dirname(database_path)}"
+            f"MAIN: Directories created: {upload_dir}, {synced_dir}, {os.path.dirname(database_path)}"
         )
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка при создании директорий: {e}")
+        logger.error(f"MAIN_ERROR: Failed to create directories: {e}")
         return
 
-    logger.info("MAIN: Загрузка SQLite")
+    logger.info("MAIN: Loading SQLite")
     file_cid_mapping = initialize_file_cid_mapping(database_path, logger)
     if file_cid_mapping is None:
-        logger.error("MAIN_ERROR: Не удалось инициализировать SQLite, завершение работы")
+        logger.error("MAIN_ERROR: Failed to initialize SQLite; shutting down")
         return
 
-    logger.info("MAIN: Поиск Kubo CLI (ipfs.exe)")
+    logger.info("MAIN: Locating Kubo CLI (ipfs.exe)")
     try:
         ipfs_path = resolve_ipfs_path(logger)
     except FileNotFoundError as e:
         logger.error(f"MAIN_ERROR: {e}")
         return
 
-    logger.info("MAIN: Проверка статуса демона IPFS")
+    logger.info("MAIN: Checking IPFS daemon status")
     try:
         subprocess.run(
             [ipfs_path, "id"],
@@ -132,10 +132,10 @@ async def main():
             check=True,
             timeout=30,
         )
-        logger.info("MAIN: Демон IPFS активен")
+        logger.info("MAIN: IPFS daemon is running")
     except subprocess.CalledProcessError as e:
-        logger.error(f"MAIN_ERROR: Ошибка при проверке демона IPFS: {e.stderr}")
-        logger.info("MAIN: Попытка запуска демона IPFS")
+        logger.error(f"MAIN_ERROR: Failed to check IPFS daemon: {e.stderr}")
+        logger.info("MAIN: Attempting to start IPFS daemon")
         try:
             subprocess.Popen(
                 [ipfs_path, "daemon"],
@@ -144,27 +144,27 @@ async def main():
             )
             await asyncio.sleep(10)
         except Exception as start_err:
-            logger.error(f"MAIN_ERROR: Не удалось запустить демон IPFS: {start_err}")
+            logger.error(f"MAIN_ERROR: Failed to start IPFS daemon: {start_err}")
             return
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Неизвестная ошибка при проверке демона IPFS: {e}")
+        logger.error(f"MAIN_ERROR: Unexpected error checking IPFS daemon: {e}")
         return
 
-    logger.info("MAIN: Инициализация IPFS")
+    logger.info("MAIN: Initializing IPFS")
     try:
         ensure_ipfs_initialized(ipfs_path, logger)
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка инициализации IPFS: {e}")
+        logger.error(f"MAIN_ERROR: Failed to initialize IPFS: {e}")
         return
 
-    logger.info("MAIN: Настройка публичной сети")
+    logger.info("MAIN: Configuring public network")
     try:
         setup_public_network(ipfs_path, logger, node_name)
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка настройки публичной сети: {e}")
+        logger.error(f"MAIN_ERROR: Failed to configure public network: {e}")
         return
 
-    logger.info("MAIN: Получение PeerID")
+    logger.info("MAIN: Retrieving PeerID")
     try:
         result = subprocess.run(
             [ipfs_path, "id", "--format=<id>"],
@@ -173,12 +173,12 @@ async def main():
             check=True,
         )
         peer_id = result.stdout.strip()
-        logger.info(f"PEER_ID: PeerID узла {node_name}: {peer_id}")
+        logger.info(f"PEER_ID: PeerID for node {node_name}: {peer_id}")
     except subprocess.CalledProcessError as e:
-        logger.error(f"PEER_ID_ERROR: Ошибка при получении PeerID: {e.stderr}")
+        logger.error(f"PEER_ID_ERROR: Failed to retrieve PeerID: {e.stderr}")
         return
 
-    logger.info("MAIN: Проверка новых файлов")
+    logger.info("MAIN: Checking for new files")
     try:
         check_new_files(
             ipfs_path,
@@ -190,10 +190,10 @@ async def main():
             database_path,
         )
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка при проверке новых файлов: {e}")
+        logger.error(f"MAIN_ERROR: Failed to check for new files: {e}")
         return
 
-    logger.info("MAIN: Настройка наблюдателя за файловой системой")
+    logger.info("MAIN: Configuring filesystem observer")
     observer = None
     try:
         event_handler = NewFileHandler(
@@ -209,14 +209,14 @@ async def main():
         observer.schedule(event_handler, upload_dir, recursive=True)
         observer.schedule(event_handler, synced_dir, recursive=True)
         observer.start()
-        logger.info("MAIN: Наблюдатель запущен")
+        logger.info("MAIN: Filesystem observer started")
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка при настройке наблюдателя: {e}")
+        logger.error(f"MAIN_ERROR: Failed to configure filesystem observer: {e}")
         if observer is not None:
             observer.stop()
         return
 
-    logger.info("MAIN: Запуск цикла проверки пинов и mDNS")
+    logger.info("MAIN: Starting pin check and mDNS loops")
     try:
         tasks = [
             asyncio.create_task(
@@ -235,9 +235,9 @@ async def main():
         ]
         await asyncio.gather(*tasks, return_exceptions=True)
     except KeyboardInterrupt:
-        logger.info("STOP: Скрипт остановлен")
+        logger.info("STOP: Script stopped")
     except Exception as e:
-        logger.error(f"MAIN_ERROR: Ошибка в основном цикле: {e}")
+        logger.error(f"MAIN_ERROR: Error in main loop: {e}")
     finally:
         if observer is not None:
             observer.stop()
@@ -246,7 +246,7 @@ async def main():
 
 async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, database_path):
     while True:
-        logger.info("PIN_CHECK_LOOP: Начало цикла проверки пиннов")
+        logger.info("PIN_CHECK_LOOP: Starting pin check cycle")
         try:
             list_pinned_files(
                 ipfs_path,
@@ -257,8 +257,8 @@ async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, syn
                 database_path,
             )
         except Exception as e:
-            logger.error(f"PIN_CHECK_LOOP_ERROR: Ошибка в цикле проверки пиннов: {e}")
-        logger.info("PIN_CHECK_LOOP: Ожидание 60 секунд")
+            logger.error(f"PIN_CHECK_LOOP_ERROR: Error in pin check cycle: {e}")
+        logger.info("PIN_CHECK_LOOP: Waiting 60 seconds")
         await asyncio.sleep(60)
 
 

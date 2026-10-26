@@ -16,25 +16,25 @@ def _entry_cid(entry):
 
 
 def sync_files_to_synced_dir(ipfs_path, synced_dir, logger, file_cid_mapping, database_path):
-    logger.info(f"MODULE_VERSION: file_sync версия {MODULE_VERSION}")
-    logger.info("SYNC_FILES_START: Начало синхронизации файлов в Synced_dir")
+    logger.info(f"MODULE_VERSION: file_sync version {MODULE_VERSION}")
+    logger.info("SYNC_FILES_START: Starting file synchronization to Synced_dir")
     try:
         os.makedirs(synced_dir, exist_ok=True)
         deleted_files = load_deleted_files(database_path, logger)
         if not file_cid_mapping:
-            logger.info("SYNC_FILES: Список файлов в SQLite пуст, синхронизация не требуется")
-            logger.info("SYNC_FILES_END: Завершение синхронизации файлов в Synced_dir")
+            logger.info("SYNC_FILES: SQLite file list is empty; no synchronization needed")
+            logger.info("SYNC_FILES_END: Finished file synchronization to Synced_dir")
             return
 
         for path, entry in file_cid_mapping.items():
             cid = _entry_cid(entry)
             if not cid:
-                logger.warning(f"SYNC_FILE_SKIPPED: У {path} нет CID")
+                logger.warning(f"SYNC_FILE_SKIPPED: No CID for {path}")
                 continue
             relative_path = path.replace("Upload/", "", 1)
             dest_path = os.path.join(synced_dir, relative_path)
             if relative_path in deleted_files:
-                logger.info(f"SYNC_FILE_SKIPPED: Файл {path} пропущен, так как он был удалён из Synced_dir")
+                logger.info(f"SYNC_FILE_SKIPPED: Skipped file {path}: previously removed from Synced_dir")
                 continue
             os.makedirs(os.path.dirname(dest_path) or synced_dir, exist_ok=True)
 
@@ -47,16 +47,16 @@ def sync_files_to_synced_dir(ipfs_path, synced_dir, logger, file_cid_mapping, da
                         text=True,
                         check=True,
                     )
-                    logger.info(f"SYNC_FILE: Файл {path} с CID {cid} загружен в {dest_path}")
+                    logger.info(f"SYNC_FILE: File {path} with CID {cid} downloaded to {dest_path}")
                     subprocess.run(
                         [ipfs_path, "pin", "add", cid],
                         capture_output=True,
                         text=True,
                         check=True,
                     )
-                    logger.info(f"SYNC_PIN: Файл {path} запинен с CID {cid}")
+                    logger.info(f"SYNC_PIN: File {path} pinned with CID {cid}")
                 except subprocess.CalledProcessError as e:
-                    logger.error(f"SYNC_FILE_ERROR: Ошибка при загрузке файла {path} с CID {cid}: {e.stderr}")
-        logger.info("SYNC_FILES_END: Завершение синхронизации файлов в Synced_dir")
+                    logger.error(f"SYNC_FILE_ERROR: Failed to download or pin file {path} with CID {cid}: {e.stderr}")
+        logger.info("SYNC_FILES_END: Finished file synchronization to Synced_dir")
     except Exception as e:
-        logger.error(f"SYNC_FILES_ERROR: Ошибка при синхронизации файлов в Synced_dir: {e}")
+        logger.error(f"SYNC_FILES_ERROR: Failed to synchronize files to Synced_dir: {e}")

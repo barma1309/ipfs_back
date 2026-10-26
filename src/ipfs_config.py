@@ -71,16 +71,16 @@ def resolve_ipfs_path(logger=None):
         seen.add(path)
         if os.path.isfile(path):
             if logger:
-                logger.info(f"IPFS_BIN_RESOLVED: найден CLI: {path}")
+                logger.info(f"IPFS_BIN_RESOLVED: CLI found: {path}")
             return path
 
     raise FileNotFoundError(
-        "Не найден ipfs. Укажите IPFS_BIN или добавьте ipfs в PATH."
+        "ipfs not found. Set IPFS_BIN or add ipfs to PATH."
     )
 
 
 def ensure_ipfs_initialized(ipfs_path, logger):
-    logger.info(f"MODULE_VERSION: ipfs_config версия {MODULE_VERSION}")
+    logger.info(f"MODULE_VERSION: ipfs_config version {MODULE_VERSION}")
     try:
         ipfs_dir = _repo_dir()
         config_file = os.path.join(ipfs_dir, "config")
@@ -88,7 +88,7 @@ def ensure_ipfs_initialized(ipfs_path, logger):
         env["IPFS_PATH"] = ipfs_dir
 
         if not os.path.isfile(config_file):
-            logger.info(f"IPFS_INIT: Репозиторий IPFS не найден ({ipfs_dir}), инициализация...")
+            logger.info(f"IPFS_INIT: IPFS repository not found ({ipfs_dir}); initializing...")
             result = subprocess.run(
                 [ipfs_path, "init"],
                 capture_output=True,
@@ -96,19 +96,19 @@ def ensure_ipfs_initialized(ipfs_path, logger):
                 check=True,
                 env=env,
             )
-            logger.info(f"IPFS_INIT: Репозиторий успешно инициализирован: {result.stdout}")
+            logger.info(f"IPFS_INIT: Repository initialized successfully: {result.stdout}")
         else:
-            logger.info(f"IPFS_INIT: Репозиторий IPFS уже существует: {ipfs_dir}")
+            logger.info(f"IPFS_INIT: IPFS repository already exists: {ipfs_dir}")
     except subprocess.CalledProcessError as e:
-        logger.error(f"IPFS_INIT_ERROR: Ошибка при инициализации IPFS: {e.stderr}")
+        logger.error(f"IPFS_INIT_ERROR: Failed to initialize IPFS: {e.stderr}")
         raise
     except Exception as e:
-        logger.error(f"IPFS_INIT_ERROR: Общая ошибка при инициализации IPFS: {e}")
+        logger.error(f"IPFS_INIT_ERROR: Unexpected error initializing IPFS: {e}")
         raise
 
 
 def setup_public_network(ipfs_path, logger, node_name):
-    logger.info(f"MODULE_VERSION: ipfs_config версия {MODULE_VERSION}")
+    logger.info(f"MODULE_VERSION: ipfs_config version {MODULE_VERSION}")
     try:
         ipfs_dir = _repo_dir()
         env = os.environ.copy()
@@ -118,7 +118,7 @@ def setup_public_network(ipfs_path, logger, node_name):
         if os.path.exists(swarm_key_path):
             os.remove(swarm_key_path)
             logger.info(
-                f"PUBLIC_NETWORK: Удалён swarm.key из {swarm_key_path} для работы в публичной сети"
+                f"PUBLIC_NETWORK: Removed swarm.key from {swarm_key_path} to use the public network"
             )
 
         subprocess.run(
@@ -128,7 +128,7 @@ def setup_public_network(ipfs_path, logger, node_name):
             check=True,
             env=env,
         )
-        logger.info("PUBLIC_NETWORK: DHT включён (Routing.Type = autoclient)")
+        logger.info("PUBLIC_NETWORK: DHT enabled (Routing.Type = autoclient)")
 
         subprocess.run(
             [ipfs_path, "config", "Discovery.MDNS.Enabled", "--bool", "true"],
@@ -137,11 +137,11 @@ def setup_public_network(ipfs_path, logger, node_name):
             check=True,
             env=env,
         )
-        logger.info("PUBLIC_NETWORK: mDNS включён (Discovery.MDNS.Enabled = true)")
-        logger.info("PUBLIC_NETWORK: Discovery.MDNS.Interval не задаём (ключ удалён в Kubo)")
+        logger.info("PUBLIC_NETWORK: mDNS enabled (Discovery.MDNS.Enabled = true)")
+        logger.info("PUBLIC_NETWORK: Skipping Discovery.MDNS.Interval (setting removed in Kubo)")
     except subprocess.CalledProcessError as e:
-        logger.error(f"PUBLIC_NETWORK_ERROR: Ошибка при настройке публичной сети: {e.stderr}")
+        logger.error(f"PUBLIC_NETWORK_ERROR: Failed to configure public network: {e.stderr}")
         raise
     except Exception as e:
-        logger.error(f"PUBLIC_NETWORK_ERROR: Общая ошибка при настройке публичной сети: {e}")
+        logger.error(f"PUBLIC_NETWORK_ERROR: Unexpected error configuring public network: {e}")
         raise
