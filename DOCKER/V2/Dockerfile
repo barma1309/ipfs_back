@@ -1,4 +1,4 @@
-# ipfs_back 2.2.2 — Python-агент + Kubo CLI в одном образе
+# ipfs_back 2.3.0 — Python-агент + Kubo CLI в одном образе
 FROM python:3.12-slim-bookworm
 
 ARG KUBO_VERSION=v0.38.2
@@ -27,7 +27,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ipfs_test_node_public.py ipfs_config.py file_monitor.py file_sync.py network_manager.py ./
+COPY ipfs_test_node_public.py ipfs_config.py file_monitor.py file_sync.py network_manager.py storage.py ./
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
     && mkdir -p /app/Upload /app/Synced_dir /app/data /data/ipfs

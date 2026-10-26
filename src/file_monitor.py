@@ -1,22 +1,18 @@
 # file_monitor.py
 # Наблюдение за Upload/Synced_dir, add+pin, запись mapping.
-# Версия 2.2.1:
+# Версия 2.3.0:
 #   * после pin add вызываем `ipfs provide once` (routing provide deprecated с Kubo 0.42)
-#   * mapping хранит {cid, date_added}
+#   * CID, даты добавления и удаления сохраняются в SQLite
 
 import os
 import subprocess
 from datetime import datetime
 from watchdog.events import FileSystemEventHandler
 
-from file_sync import (
-    sync_files_to_synced_dir,
-    save_file_cid_mapping,
-    load_deleted_files,
-    save_deleted_files,
-)
+from file_sync import sync_files_to_synced_dir
+from storage import mark_deleted_file
 
-MODULE_VERSION = "2.2.2"
+MODULE_VERSION = "2.3.0"
 
 
 def _announce_cid(ipfs_path, cid, logger, path):
@@ -59,7 +55,7 @@ class NewFileHandler(FileSystemEventHandler):
         logger,
         file_cid_mapping,
         synced_dir,
-        deleted_files_path,
+        database_path,
         delete_after_sync=True,
     ):
         super().__init__()
@@ -69,7 +65,7 @@ class NewFileHandler(FileSystemEventHandler):
         self.logger.info(f"MODULE_VERSION: file_monitor версия {MODULE_VERSION}")
         self.file_cid_mapping = file_cid_mapping
         self.synced_dir = synced_dir
-        self.deleted_files_path = deleted_files_path
+        self.database_path = database_path
         self.delete_after_sync = delete_after_sync
 
     def on_created(self, event):
@@ -82,14 +78,11 @@ class NewFileHandler(FileSystemEventHandler):
             try:
                 if self.synced_dir in event.src_path:
                     relative_path = os.path.relpath(event.src_path, self.synced_dir)
-                    deleted_files = load_deleted_files(self.deleted_files_path, self.logger)
-                    if relative_path not in deleted_files:
-                        deleted_files.append(relative_path)
-                        save_deleted_files(self.deleted_files_path, deleted_files, self.logger)
-                        self.logger.info(
-                            f"REMOVE_FILE_SYNCED: Файл {relative_path} удалён из Synced_dir "
-                            f"в {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                        )
+                    mark_deleted_file(self.database_path, relative_path)
+                    self.logger.info(
+                        f"REMOVE_FILE_SYNCED: Файл {relative_path} удалён из Synced_dir "
+                        f"в {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
             except ValueError as e:
                 self.logger.debug(
                     f"REMOVE_FILE_SKIPPED: Пропущен файл {event.src_path}, не в Synced_dir: {e}"
@@ -119,7 +112,6 @@ class NewFileHandler(FileSystemEventHandler):
                     cid = parts[1]
                     path = parts[2] if len(parts) > 2 else relative_path
                     date_added = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    self.file_cid_mapping[path] = {"cid": cid, "date_added": date_added}
                     self.logger.info(f"ADD_FILE: Файл {path} добавлен с CID {cid} в {date_added}")
                     subprocess.run(
                         [self.ipfs_path, "pin", "add", cid],
@@ -128,16 +120,15 @@ class NewFileHandler(FileSystemEventHandler):
                         check=True,
                     )
                     self.logger.info(f"PIN_ADD: Файл {path} запинен с CID {cid}")
+                    self.file_cid_mapping[path] = {"cid": cid, "date_added": date_added}
                     _announce_cid(self.ipfs_path, cid, self.logger, path)
 
-            mapping_file = os.path.join(os.path.dirname(__file__), "../data", "file_cid_mapping.json")
-            save_file_cid_mapping(mapping_file, self.file_cid_mapping, self.logger)
             sync_files_to_synced_dir(
                 self.ipfs_path,
                 self.synced_dir,
                 self.logger,
                 self.file_cid_mapping,
-                self.deleted_files_path,
+                self.database_path,
             )
 
             if self.delete_after_sync:
@@ -156,7 +147,7 @@ class NewFileHandler(FileSystemEventHandler):
             self.logger.error(f"ADD_ERROR: Общая ошибка при добавлении файла {file_path}: {e}")
 
 
-def check_new_files(ipfs_path, upload_dir, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path):
+def check_new_files(ipfs_path, upload_dir, node_name, logger, file_cid_mapping, synced_dir, database_path):
     logger.info(f"MODULE_VERSION: file_monitor версия {MODULE_VERSION}")
     logger.info("CHECK_NEW_FILES_START: Начало проверки новых файлов")
     try:
@@ -175,11 +166,11 @@ def check_new_files(ipfs_path, upload_dir, node_name, logger, file_cid_mapping, 
                         logger,
                         file_cid_mapping,
                         synced_dir,
-                        deleted_files_path,
+                        database_path,
                     )
                     handler.add_to_ipfs(file_path)
         sync_files_to_synced_dir(
-            ipfs_path, synced_dir, logger, file_cid_mapping, deleted_files_path
+            ipfs_path, synced_dir, logger, file_cid_mapping, database_path
         )
         logger.info("CHECK_NEW_FILES_END: Завершение проверки новых файлов")
     except Exception as e:

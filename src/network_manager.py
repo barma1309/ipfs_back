@@ -1,14 +1,14 @@
 # network_manager.py
 # Пиры, routing-проверка и список пинов.
-# Версия 2.2.1:
+# Версия 2.3.0:
 #   * ipfs dht * заменён на ipfs routing findprovs (dht API снят с 0.27)
 #   * не ищем собственный PeerID через findpeer
-#   * list_pinned_files читает новый формат mapping {cid, date_added}
+#   * list_pinned_files читает mapping {cid, date_added} из SQLite
 
 import subprocess
 import asyncio
 
-MODULE_VERSION = "2.2.2"
+MODULE_VERSION = "2.3.0"
 
 
 def _first_cid(file_cid_mapping):
@@ -95,7 +95,7 @@ async def manage_mdns_connections(ipfs_path, node_name, logger, file_cid_mapping
             await asyncio.sleep(60)
 
 
-def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path):
+def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, database_path):
     logger.info(f"MODULE_VERSION: network_manager версия {MODULE_VERSION}")
     logger.info("LIST_PINNED_START: Начало вывода списка запиненных файлов")
     try:
@@ -114,7 +114,7 @@ def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir
 
         logger.info(f"LIST_PINNED: Список запинненных файлов и каталогов на ноде {node_name}:")
         if not file_cid_mapping:
-            logger.info("LIST_PINNED: file_cid_mapping.json пуст, нет файлов для отображения")
+            logger.info("LIST_PINNED: Список файлов в SQLite пуст, нет файлов для отображения")
         for path, entry in file_cid_mapping.items():
             if isinstance(entry, dict):
                 cid = entry.get("cid", "")
@@ -130,7 +130,7 @@ def list_pinned_files(ipfs_path, node_name, logger, file_cid_mapping, synced_dir
         from file_sync import sync_files_to_synced_dir
 
         sync_files_to_synced_dir(
-            ipfs_path, synced_dir, logger, file_cid_mapping, deleted_files_path
+            ipfs_path, synced_dir, logger, file_cid_mapping, database_path
         )
         logger.info("LIST_PINNED_END: Завершение вывода списка запиненных файлов")
     except subprocess.CalledProcessError as e:

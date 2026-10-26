@@ -1,72 +1,12 @@
 # file_sync.py
-# Сохранение mapping, список удалённых файлов, выгрузка CID в Synced_dir.
-# Версия 2.2.1: без фильтра .txt; поддержка {cid, date_added}.
+# Синхронизация файлов по CID, список удалённых файлов из SQLite.
+# Версия 2.3.0: хранение mapping и удалённых файлов в SQLite.
 
 import os
 import subprocess
-import json
-from datetime import datetime
+from storage import load_deleted_files
 
-MODULE_VERSION = "2.2.2"
-
-
-def backup_file_cid_mapping(mapping_file, logger):
-    logger.info(f"MODULE_VERSION: file_sync версия {MODULE_VERSION}")
-    logger.info("BACKUP_MAPPING_START: Начало создания резервной копии file_cid_mapping.json")
-    try:
-        if os.path.exists(mapping_file):
-            backup_dir = os.path.join(os.path.dirname(mapping_file), "backups")
-            os.makedirs(backup_dir, exist_ok=True)
-            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            backup_file = os.path.join(backup_dir, f"file_cid_mapping_{timestamp}.json")
-            with open(mapping_file, "r", encoding="utf-8") as src, open(
-                backup_file, "w", encoding="utf-8"
-            ) as dst:
-                dst.write(src.read())
-            logger.info(f"BACKUP_MAPPING: Создана резервная копия {backup_file}")
-        else:
-            logger.info("BACKUP_MAPPING: Файл file_cid_mapping.json не существует, пропуск резервного копирования")
-        logger.info("BACKUP_MAPPING_END: Завершение создания резервной копии")
-    except Exception as e:
-        logger.error(f"BACKUP_MAPPING_ERROR: Ошибка при создании резервной копии {mapping_file}: {e}")
-
-
-def load_deleted_files(deleted_files_path, logger):
-    try:
-        if os.path.exists(deleted_files_path):
-            with open(deleted_files_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        logger.info(f"DELETED_FILES: Файл {deleted_files_path} не существует, возвращается пустой список")
-        return []
-    except Exception as e:
-        logger.error(f"DELETED_FILES_ERROR: Ошибка при загрузке deleted_files.json: {e}")
-        return []
-
-
-def save_deleted_files(deleted_files_path, deleted_files, logger):
-    logger.info(f"MODULE_VERSION: file_sync версия {MODULE_VERSION}")
-    logger.info("SAVE_DELETED_FILES_START: Начало сохранения deleted_files.json")
-    try:
-        os.makedirs(os.path.dirname(deleted_files_path), exist_ok=True)
-        with open(deleted_files_path, "w", encoding="utf-8") as f:
-            json.dump(deleted_files, f, indent=2)
-        logger.info(f"DELETED_FILES: Сохранён список удалённых файлов в {deleted_files_path}")
-        logger.info("SAVE_DELETED_FILES_END: Завершение сохранения deleted_files.json")
-    except Exception as e:
-        logger.error(f"DELETED_FILES_ERROR: Ошибка при сохранении deleted_files.json: {e}")
-
-
-def save_file_cid_mapping(mapping_file, file_cid_mapping, logger):
-    logger.info(f"MODULE_VERSION: file_sync версия {MODULE_VERSION}")
-    logger.info("SAVE_FILE_CID_MAPPING_START: Начало сохранения file_cid_mapping.json")
-    try:
-        os.makedirs(os.path.dirname(mapping_file), exist_ok=True)
-        with open(mapping_file, "w", encoding="utf-8") as f:
-            json.dump(file_cid_mapping, f, indent=2, ensure_ascii=False)
-        logger.info(f"SAVE_FILE_CID_MAPPING: Сохранён file_cid_mapping.json в {mapping_file}")
-        logger.info("SAVE_FILE_CID_MAPPING_END: Завершение сохранения file_cid_mapping.json")
-    except Exception as e:
-        logger.error(f"SAVE_FILE_CID_MAPPING_ERROR: Ошибка при сохранении file_cid_mapping.json: {e}")
+MODULE_VERSION = "2.3.0"
 
 
 def _entry_cid(entry):
@@ -75,14 +15,14 @@ def _entry_cid(entry):
     return entry
 
 
-def sync_files_to_synced_dir(ipfs_path, synced_dir, logger, file_cid_mapping, deleted_files_path):
+def sync_files_to_synced_dir(ipfs_path, synced_dir, logger, file_cid_mapping, database_path):
     logger.info(f"MODULE_VERSION: file_sync версия {MODULE_VERSION}")
     logger.info("SYNC_FILES_START: Начало синхронизации файлов в Synced_dir")
     try:
         os.makedirs(synced_dir, exist_ok=True)
-        deleted_files = load_deleted_files(deleted_files_path, logger)
+        deleted_files = load_deleted_files(database_path, logger)
         if not file_cid_mapping:
-            logger.info("SYNC_FILES: file_cid_mapping.json пуст, синхронизация не требуется")
+            logger.info("SYNC_FILES: Список файлов в SQLite пуст, синхронизация не требуется")
             logger.info("SYNC_FILES_END: Завершение синхронизации файлов в Synced_dir")
             return
 

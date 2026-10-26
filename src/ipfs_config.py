@@ -1,6 +1,6 @@
 # ipfs_config.py
 # Инициализация репозитория и публичной сети Kubo.
-# Версия 2.2.3:
+# Версия 2.3.0:
 #   * CLI: IPFS_BIN → PATH → Windows-пути (IPFS_PATH больше не считается бинарником)
 #   * репозиторий: env IPFS_PATH → ~/.ipfs
 #   * init только если нет $IPFS_PATH/config
@@ -9,7 +9,7 @@ import os
 import shutil
 import subprocess
 
-MODULE_VERSION = "2.2.3"
+MODULE_VERSION = "2.3.0"
 
 
 def _repo_dir():

@@ -1,6 +1,7 @@
 # ipfs_test_node_public.py
 # Главный модуль агента синхронизации файлов через локальный Kubo CLI.
-# Версия 2.2.1 — совместимость с Kubo 0.27–0.43 (сентябрь 2026):
+# Версия 2.3.0 — SQLite и совместимость с Kubo 0.27–0.43:
+#   * автоматическая миграция JSON в SQLite при первом запуске
 #   * routing через `ipfs routing findprovs`, не `ipfs dht *`
 #   * не вызываем findpeer для собственного PeerID
 #   * Discovery.MDNS.Interval больше не настраивается (ключ удалён в Kubo)
@@ -9,7 +10,6 @@
 
 import os
 import subprocess
-import json
 import logging
 import asyncio
 from watchdog.observers import Observer
@@ -31,9 +31,10 @@ from network_manager import (
     MODULE_VERSION as NETWORK_MANAGER_VERSION,
 )
 from file_sync import MODULE_VERSION as FILE_SYNC_VERSION
+from storage import FileCIDMapping, MODULE_VERSION as STORAGE_VERSION
 
 # Единая версия пакета. Все модули должны совпадать.
-SCRIPT_VERSION = "2.2.2"
+SCRIPT_VERSION = "2.3.0"
 
 
 def setup_logging(node_name):
@@ -68,6 +69,7 @@ def setup_logging(node_name):
         ("file_monitor", FILE_MONITOR_VERSION),
         ("network_manager", NETWORK_MANAGER_VERSION),
         ("file_sync", FILE_SYNC_VERSION),
+        ("storage", STORAGE_VERSION),
     ):
         if version != expected_version:
             logger.warning(
@@ -77,34 +79,11 @@ def setup_logging(node_name):
     return logger
 
 
-def initialize_file_cid_mapping(mapping_file, logger):
-    """
-    Загружает file_cid_mapping.json или создаёт пустой файл.
-    Поддерживает старый формат {"path": "cid"} и новый
-    {"path": {"cid": "...", "date_added": "..."}}.
-    """
+def initialize_file_cid_mapping(database_path, logger):
     try:
-        if not os.path.exists(mapping_file):
-            logger.info(
-                f"MAIN: file_cid_mapping.json not found, creating new file at {mapping_file}"
-            )
-            with open(mapping_file, "w", encoding="utf-8") as f:
-                json.dump({}, f, indent=4)
-            return {}
-
-        logger.info(f"MAIN: Loading file_cid_mapping.json from {mapping_file}")
-        with open(mapping_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        converted = {}
-        for path, entry in data.items():
-            if isinstance(entry, str):
-                converted[path] = {"cid": entry, "date_added": "unknown"}
-            else:
-                converted[path] = entry
-        return converted
-    except Exception as e:
-        logger.error(f"MAIN_ERROR: Failed to initialize file_cid_mapping.json: {str(e)}")
+        return FileCIDMapping(database_path)
+    except Exception:
+        logger.exception("MAIN_ERROR: Не удалось инициализировать SQLite или перенести JSON")
         return None
 
 
@@ -112,8 +91,7 @@ async def main():
     node_name = "local"
     upload_dir = os.path.join(os.path.dirname(__file__), "../Upload")
     synced_dir = os.path.join(os.path.dirname(__file__), "../Synced_dir")
-    mapping_file = os.path.join(os.path.dirname(__file__), "../data", "file_cid_mapping.json")
-    deleted_files_path = os.path.join(os.path.dirname(__file__), "../data", "deleted_files.json")
+    database_path = os.path.join(os.path.dirname(__file__), "../data", "ipfs.sqlite3")
 
     logger = setup_logging(node_name)
     logger.info(
@@ -124,18 +102,18 @@ async def main():
     try:
         os.makedirs(upload_dir, exist_ok=True)
         os.makedirs(synced_dir, exist_ok=True)
-        os.makedirs(os.path.dirname(mapping_file), exist_ok=True)
+        os.makedirs(os.path.dirname(database_path), exist_ok=True)
         logger.info(
-            f"MAIN: Директории созданы: {upload_dir}, {synced_dir}, {os.path.dirname(mapping_file)}"
+            f"MAIN: Директории созданы: {upload_dir}, {synced_dir}, {os.path.dirname(database_path)}"
         )
     except Exception as e:
         logger.error(f"MAIN_ERROR: Ошибка при создании директорий: {e}")
         return
 
-    logger.info("MAIN: Загрузка file_cid_mapping.json")
-    file_cid_mapping = initialize_file_cid_mapping(mapping_file, logger)
+    logger.info("MAIN: Загрузка SQLite")
+    file_cid_mapping = initialize_file_cid_mapping(database_path, logger)
     if file_cid_mapping is None:
-        logger.error("MAIN_ERROR: Не удалось инициализировать file_cid_mapping.json, завершение работы")
+        logger.error("MAIN_ERROR: Не удалось инициализировать SQLite, завершение работы")
         return
 
     logger.info("MAIN: Поиск Kubo CLI (ipfs.exe)")
@@ -209,7 +187,7 @@ async def main():
             logger,
             file_cid_mapping,
             synced_dir,
-            deleted_files_path,
+            database_path,
         )
     except Exception as e:
         logger.error(f"MAIN_ERROR: Ошибка при проверке новых файлов: {e}")
@@ -224,7 +202,7 @@ async def main():
             logger,
             file_cid_mapping,
             synced_dir,
-            deleted_files_path,
+            database_path,
             delete_after_sync=True,
         )
         observer = Observer()
@@ -251,7 +229,7 @@ async def main():
                     logger,
                     file_cid_mapping,
                     synced_dir,
-                    deleted_files_path,
+                    database_path,
                 )
             ),
         ]
@@ -266,7 +244,7 @@ async def main():
             observer.join()
 
 
-async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, deleted_files_path):
+async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, synced_dir, database_path):
     while True:
         logger.info("PIN_CHECK_LOOP: Начало цикла проверки пиннов")
         try:
@@ -276,7 +254,7 @@ async def run_pin_check_loop(ipfs_path, node_name, logger, file_cid_mapping, syn
                 logger,
                 file_cid_mapping,
                 synced_dir,
-                deleted_files_path,
+                database_path,
             )
         except Exception as e:
             logger.error(f"PIN_CHECK_LOOP_ERROR: Ошибка в цикле проверки пиннов: {e}")
